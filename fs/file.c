@@ -1033,6 +1033,7 @@ struct file *file_close_fd(unsigned int fd)
 
 	return file;
 }
+EXPORT_SYMBOL(file_close_fd);
 
 void close_cloexec_files(struct files_struct *files)
 {
