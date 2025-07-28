@@ -176,14 +176,6 @@ else
 	# Use -mskip-rax-setup if supported.
 	KBUILD_CFLAGS += -mskip-rax-setup
 
-ifdef CONFIG_X86_NATIVE_CPU
-        KBUILD_CFLAGS += -march=native
-        KBUILD_RUSTFLAGS += -Ctarget-cpu=native
-else
-        KBUILD_CFLAGS += -march=x86-64 -mtune=generic
-        KBUILD_RUSTFLAGS += -Ctarget-cpu=x86-64 -Ztune-cpu=generic
-endif
-
         KBUILD_CFLAGS += -mno-red-zone
         KBUILD_CFLAGS += -mcmodel=kernel
         KBUILD_RUSTFLAGS += -Cno-redzone=y
