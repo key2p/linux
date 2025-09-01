@@ -290,9 +290,9 @@ static const struct fs_parameter_spec ntfs_fs_parameters[] = {
 	fsparam_flag("hide_dot_files",	Opt_hide_dot_files),
 	fsparam_flag("windows_names",	Opt_windows_names),
 	fsparam_flag("showmeta",	Opt_showmeta),
-	fsparam_flag("acl",		Opt_acl),
+	fsparam_flag_no("acl",		Opt_acl),
 	fsparam_string("iocharset",	Opt_iocharset),
-	fsparam_flag("prealloc",	Opt_prealloc),
+	fsparam_flag_no("prealloc",	Opt_prealloc),
 	fsparam_flag("nocase",		Opt_nocase),
 	{}
 };
@@ -401,7 +401,7 @@ static int ntfs_fs_parse_param(struct fs_context *fc,
 		param->string = NULL;
 		break;
 	case Opt_prealloc:
-		opts->prealloc = 1;
+		opts->prealloc = !result.negated;
 		break;
 	case Opt_nocase:
 		opts->nocase = 1;
@@ -1103,6 +1103,7 @@ read_boot:
 		dev_size += sector_size - 1;
 	}
 
+	sbi->bdev_blocksize_mask = max(boot_sector_size, sector_size) - 1;
 	sbi->mft.lbo = mlcn << cluster_bits;
 	sbi->mft.lbo2 = mlcn2 << cluster_bits;
 
@@ -1364,7 +1365,7 @@ static int ntfs_fill_super(struct super_block *sb, struct fs_context *fc)
 	sbi->volume.ni = ni;
 	if (info->flags & VOLUME_FLAG_DIRTY) {
 		sbi->volume.real_dirty = true;
-		ntfs_info(sb, "It is recommened to use chkdsk.");
+		ntfs_info(sb, "It is recommended to use chkdsk.");
 	}
 
 	/* Load $MFTMirr to estimate recs_mirr. */
@@ -1841,6 +1842,12 @@ static int __ntfs_init_fs_context(struct fs_context *fc)
 	opts->fs_gid = current_gid();
 	opts->fs_fmask_inv = ~current_umask();
 	opts->fs_dmask_inv = ~current_umask();
+	opts->prealloc = 1;
+
+#ifdef CONFIG_NTFS3_FS_POSIX_ACL
+	/* Set the default value 'acl' */
+	fc->sb_flags |= SB_POSIXACL;
+#endif
 
 	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE)
 		goto ok;
