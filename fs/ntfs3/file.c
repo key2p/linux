@@ -19,6 +19,12 @@
 #include "ntfs.h"
 #include "ntfs_fs.h"
 
+/*
+ * cifx, btrfs, exfat, ext4, f2fs use this constant.
+ * Hope this value will become common to all fs.
+ */
+#define NTFS3_IOC_SHUTDOWN _IOR('X', 125, __u32)
+
 static int ntfs_ioctl_fitrim(struct ntfs_sb_info *sbi, unsigned long arg)
 {
 	struct fstrim_range __user *user_range;
@@ -77,12 +83,46 @@ static int ntfs_ioctl_set_volume_label(struct ntfs_sb_info *sbi, u8 __user *buf)
 }
 
 /*
+ * ntfs_force_shutdown - helper function. Called from ioctl
+ */
+static int ntfs_force_shutdown(struct super_block *sb, u32 flags)
+{
+	int err;
+	struct ntfs_sb_info *sbi = sb->s_fs_info;
+
+	if (unlikely(ntfs3_forced_shutdown(sb)))
+		return 0;
+
+	/* No additional options yet (flags). */
+	err = bdev_freeze(sb->s_bdev);
+	if (err)
+		return err;
+	set_bit(NTFS_FLAGS_SHUTDOWN_BIT, &sbi->flags);
+	bdev_thaw(sb->s_bdev);
+	return 0;
+}
+
+static int ntfs_ioctl_shutdown(struct super_block *sb, unsigned long arg)
+{
+	u32 flags;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (get_user(flags, (__u32 __user *)arg))
+		return -EFAULT;
+
+	return ntfs_force_shutdown(sb, flags);
+}
+
+/*
  * ntfs_ioctl - file_operations::unlocked_ioctl
  */
 long ntfs_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
-	struct ntfs_sb_info *sbi = inode->i_sb->s_fs_info;
+	struct super_block *sb = inode->i_sb;
+	struct ntfs_sb_info *sbi = sb->s_fs_info;
 
 	/* Avoid any operation if inode is bad. */
 	if (unlikely(is_bad_ni(ntfs_i(inode))))
@@ -95,6 +135,8 @@ long ntfs_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 		return ntfs_ioctl_get_volume_label(sbi, (u8 __user *)arg);
 	case FS_IOC_SETFSLABEL:
 		return ntfs_ioctl_set_volume_label(sbi, (u8 __user *)arg);
+	case NTFS3_IOC_SHUTDOWN:
+		return ntfs_ioctl_shutdown(sb, arg);
 	}
 	return -ENOTTY; /* Inappropriate ioctl for device. */
 }
@@ -328,9 +370,14 @@ static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 		return -EOPNOTSUPP;
 	}
 
-	if (is_compressed(ni) && rw) {
-		ntfs_inode_warn(inode, "mmap(write) compressed not supported");
-		return -EOPNOTSUPP;
+	if (is_compressed(ni)) {
+		if (rw) {
+			ntfs_inode_warn(inode,
+					"mmap(write) compressed not supported");
+			return -EOPNOTSUPP;
+		}
+		/* Turn off readahead for compressed files. */
+		file->f_ra.ra_pages = 0;
 	}
 
 	if (rw) {
@@ -885,9 +932,24 @@ static ssize_t ntfs_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	if (err)
 		return err;
 
-	if (is_compressed(ni) && (iocb->ki_flags & IOCB_DIRECT)) {
-		ntfs_inode_warn(inode, "direct i/o + compressed not supported");
-		return -EOPNOTSUPP;
+	if (is_compressed(ni)) {
+		if (iocb->ki_flags & IOCB_DIRECT) {
+			ntfs_inode_warn(
+				inode, "direct i/o + compressed not supported");
+			return -EOPNOTSUPP;
+		}
+		/* Turn off readahead for compressed files. */
+		file->f_ra.ra_pages = 0;
+	}
+
+	/* Check minimum alignment for dio. */
+	if (iocb->ki_flags & IOCB_DIRECT) {
+		struct super_block *sb = inode->i_sb;
+		struct ntfs_sb_info *sbi = sb->s_fs_info;
+		if ((iocb->ki_pos | iov_iter_alignment(iter)) &
+		    sbi->bdev_blocksize_mask) {
+			iocb->ki_flags &= ~IOCB_DIRECT;
+		}
 	}
 
 	return generic_file_read_iter(iocb, iter);
@@ -906,6 +968,11 @@ static ssize_t ntfs_file_splice_read(struct file *in, loff_t *ppos,
 	err = check_read_restriction(inode);
 	if (err)
 		return err;
+
+	if (is_compressed(ntfs_i(inode))) {
+		/* Turn off readahead for compressed files. */
+		in->f_ra.ra_pages = 0;
+	}
 
 	return filemap_splice_read(in, ppos, pipe, len, flags);
 }
