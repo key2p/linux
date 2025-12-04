@@ -23,8 +23,12 @@ bash ${WORK_DIR}/ci/patch-linux-files.sh
 export DEBFULLNAME="Alexandre Frade"
 export DEBEMAIL="kernel@xanmod.org"
 export KDEB_CHANGELOG_DIST="bookworm"
+export ABI=3
+
+./scripts/config --file ${MAIN_KCONFIG_FILE} --set-str LOCALVERSION "-x64v${ABI}" --set-val X86_64_VERSION ${ABI}
 
 export lv=$(make -s kernelversion)
+export pv=$(cat ${MAIN_KCONFIG_FILE} | grep 'LOCALVERSION=' | cut -d'"' -f2)
 export xv="-xanmod1"
 export rv=0
 
@@ -34,8 +38,13 @@ if [ "$PAREL_BUILD" -ge '12' ]; then
 fi
 
 date; time make olddefconfig LLVM=1 LLVM_IAS=1
-date; time make KDEB_COMPRESS=xz INSTALL_MOD_STRIP=1 bindeb-pkg -j${PAREL_BUILD} LLVM=1 LLVM_IAS=1 || (date; echo $PATH; make KDEB_COMPRESS=xz INSTALL_MOD_STRIP=1 bindeb-pkg -j${PAREL_BUILD} LLVM=1 LLVM_IAS=1)
+date; time make KDEB_COMPRESS=xz INSTALL_MOD_STRIP=1 bindeb-pkg KDEB_PKGVERSION="$lv$pv$xv-$rv" -j${PAREL_BUILD} LLVM=1 LLVM_IAS=1 || (date; echo $PATH; make KDEB_COMPRESS=xz INSTALL_MOD_STRIP=1 bindeb-pkg KDEB_PKGVERSION="$lv$pv$xv-$rv" -j${PAREL_BUILD} LLVM=1 LLVM_IAS=1)
+
 date
+
+build_kernel_deb=$(find "${WORK_DIR}/../" -maxdepth 1 -name "linux-image-*.deb" | grep "x64v${ABI}" |  head -n 1)
+[ -e "${build_kernel_deb}" ] && (cp -f "${build_kernel_deb}"  "/dev/shm/kernelv${ABI}.deb" || true)
+
 
 # 统计builtin的文件大小
 bash ${WORK_DIR}/ci/report-object-sizes.sh
