@@ -1,6 +1,9 @@
 name: xanmod edge cloud kernel deb by github
 
 on:
+  push:
+    branches:
+      - apod/**
   workflow_dispatch:
 
 env:
@@ -11,7 +14,7 @@ env:
 
 jobs:
   Build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check Xanmod Version
         id: checkver
@@ -28,7 +31,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo -E rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android $AGENT_TOOLSDIRECTORY || true
+          sudo -E rm -rf /usr/share/dotnet /usr/local/lib/android $AGENT_TOOLSDIRECTORY || true
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* aspnet* powershell openjdk* mongodb* moby* || true
           sudo -E /bin/bash -c "systemctl daemon-reload; apt-get -y autoremove --purge; apt-get -y clean" || true
           sudo -E timedatectl set-timezone "$TZ" || true
@@ -63,10 +66,13 @@ jobs:
           set -ex
           df -hT $GITHUB_WORKSPACE
           cd $WORK_DIR
+          mkdir -p $WORK_DIR/debs || true
           sudo -E bash $WORK_DIR/ci/build_xanmod_docker.sh
           bash $WORK_DIR/ci/build_xanmod_kernel.sh
-          mkdir -p $WORK_DIR/debs || true
           mv -f $WORK_DIR/../*.deb $WORK_DIR/debs/ || true
+          sudo -E bash -c "./ci/build_alpine_rootfs.sh && cp -f /dev/shm/alpine-part-rootfs.tar.gz $WORK_DIR/debs"
+          sudo -E bash -c "./ci/build_apod.sh -a v3 --all && cp -f /dev/shm/cache/dist/* $WORK_DIR/debs/ && chmod -R 0777 $WORK_DIR/debs"
+
           cd $WORK_DIR/debs/
           echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
           echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
