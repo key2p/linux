@@ -13,9 +13,15 @@ cat arch/x86/Makefile | grep KBUILD_CFLAGS
 [ -e "CONFIGS/x86_64/config" ] && cp -a CONFIGS/x86_64/config ${MAIN_KCONFIG_FILE}
 
 if [ "$BUILD_TYPE" != "std" ]; then
-  # cloud 版本不需要 kvm
+  # cloud 版本不需要 kvm, quirks
   sed -i 's/CONFIG_KVM=[mny]/CONFIG_KVM=n/g'                                    ${MAIN_KCONFIG_FILE}
+  sed -i 's/CONFIG_PCI_QUIRKS=[mny]/CONFIG_PCI_QUIRKS=n/g'                                    ${MAIN_KCONFIG_FILE}
 fi
+
+# 不需要背光, MFD, PinCTRL,MISC,NPU等
+sed -i 's/CONFIG_BACKLIGHT/#CONFIG_BACKLIGHT/g'                                    ${MAIN_KCONFIG_FILE}
+sed -i 's/CONFIG_PINCTRL/#CONFIG_PINCTRL/g'                                    ${MAIN_KCONFIG_FILE}
+
 
 # CONFIG_KALLSYMS=y, so no need System.map file
 bash ${WORK_DIR}/ci/patch-linux-files.sh
