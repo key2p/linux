@@ -57,6 +57,9 @@
 
 HDR_EOF
 
+#[ -e ./drivers/usb/host/xhci-trace.h ] && echo "" > ./drivers/usb/host/xhci-trace.h
+#sed -i 's/EXPORT_TRACEPOINT/#EXPORT_TRACEPOINT/g'      ./drivers/usb/host/xhci-trace.c
+
 [ -e ./fs/xfs/xfs_trace.h ] && echo "" > ./fs/xfs/xfs_trace.h
 
 if [ -e ./drivers/hv/Makefile ]; then
