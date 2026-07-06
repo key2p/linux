@@ -1404,11 +1404,7 @@ int proc_do_static_key(const struct ctl_table *table, int dir,
 }
 
 static const struct ctl_table sysctl_subsys_table[] = {
-<<<<<<< HEAD
-<<<<<<< HEAD
 #ifdef CONFIG_SYSCTL
-=======
-=======
 	{
 		.procname	= "yield_type",
 		.data		= &sysctl_sched_yield_type,
@@ -1418,7 +1414,6 @@ static const struct ctl_table sysctl_subsys_table[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_TWO,
 	},
->>>>>>> XANMOD: add sysctl sysctl_sched_yield_type
 #ifdef CONFIG_USER_NS
 	{
 		.procname	= "unprivileged_userns_clone",
@@ -1428,8 +1423,6 @@ static const struct ctl_table sysctl_subsys_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 #endif
-#ifdef CONFIG_PROC_SYSCTL
->>>>>>> XANMOD: sysctl: add sysctl to disallow unprivileged CLONE_NEWUSER by default
 	{
 		.procname	= "sysctl_writes_strict",
 		.data		= &sysctl_writes_strict,
