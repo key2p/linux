@@ -51,6 +51,14 @@ date
 build_kernel_deb=$(find "${WORK_DIR}/../" -maxdepth 1 -name "linux-image-*.deb" | grep "x64v${ABI}" |  head -n 1)
 [ -e "${build_kernel_deb}" ] && (cp -f "${build_kernel_deb}"  "/dev/shm/kernelv${ABI}.deb" || true)
 
+# APOD sysctl tuning deb (same version as kernel deb; ci.yml mv picks it into debs/)
+SYSCTL_CONF="${WORK_DIR}/CONFIGS/sysctl.d/70-apod-server.conf"
+if [ -e "${SYSCTL_CONF}" ]; then
+  bash "${WORK_DIR}/ci/build_sysctl_deb.sh" "${SYSCTL_CONF}" "${lv}${pv}${xv}-${rv}" "${WORK_DIR}/../"
+else
+  echo "no ${SYSCTL_CONF}, skip apod-sysctl deb"
+fi
+
 
 # 统计builtin的文件大小
 bash ${WORK_DIR}/ci/report-object-sizes.sh
