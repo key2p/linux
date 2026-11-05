@@ -45,6 +45,7 @@
 #define trace_wakeup_source_deactivate(x,...)
 
 #define trace_cpu_frequency(x,...)
+#define trace_call__cpu_frequency(x,...)
 #define trace_cpu_frequency_enabled() false
 #define trace_cpu_frequency_limits(x,...)
 
@@ -54,15 +55,22 @@
 
 #define trace_pstate_sample_enabled() false
 #define trace_pstate_sample(x,...)
+#define trace_call__pstate_sample(x,...)
 
 HDR_EOF
+
+#[ -e ./drivers/usb/host/xhci-trace.h ] && echo "" > ./drivers/usb/host/xhci-trace.h
+#sed -i 's/EXPORT_TRACEPOINT/#EXPORT_TRACEPOINT/g'      ./drivers/usb/host/xhci-trace.c
 
 [ -e ./fs/xfs/xfs_trace.h ] && echo "" > ./fs/xfs/xfs_trace.h
 
 if [ -e ./drivers/hv/Makefile ]; then
   sed -i 's/CONFIG_DEBUG_FS/CONFIG_DEBUG_FS_MSHV/g'      ./drivers/hv/mshv_root.h
   echo '' > ./drivers/hv/mshv_debugfs.c
+  echo '' > ./drivers/hv/mshv_trace.c
+  echo '' > ./drivers/hv/hv_trace.c
 
+  sed -i '/mshv_trace.o/s/^/#/' ./drivers/hv/Makefile
   sed -i 's/hv_trace.o//g'      ./drivers/hv/Makefile
   sed -i '/hv_debugfs.o/s/^/#/' ./drivers/hv/Makefile
 
@@ -74,7 +82,11 @@ if [ -e ./drivers/hv/Makefile ]; then
     fi
 
 	sed -i -E '
-	/^[[:space:]]*trace_vmbus_.*\);/ {
+        /^[[:space:]]*trace_vmbus_.*\);/ {
+                s/^/{}\/\//
+                b
+        }
+	/^[[:space:]]*trace_mshv_.*\);/ {
 		s/^/{}\/\//
 		b
 	}
@@ -82,7 +94,14 @@ if [ -e ./drivers/hv/Makefile ]; then
 		s/^/{}\/\//
 		b
 	}
-	/^[[:space:]]*trace_vmbus_/ {
+        /^[[:space:]]*trace_vmbus_/ {
+                s/^/{}\/\//
+                :a
+                n
+                s/^/\/\/\//
+                /\);/! ba
+        }
+	/^[[:space:]]*trace_mshv_/ {
 		s/^/{}\/\//
 		:a
 		n
