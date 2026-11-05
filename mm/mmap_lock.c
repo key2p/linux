@@ -367,6 +367,7 @@ inval:
 	count_vm_vma_lock_event(VMA_LOCK_ABORT);
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(lock_vma_under_rcu);
 
 /**
  * vma_start_read_unlocked() - Find the VMA covering 'address' and read-lock it.
